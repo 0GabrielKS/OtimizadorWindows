@@ -2,7 +2,28 @@ import subprocess
 import os
 import shutil
 import psutil
+import logging
+from funcoes.logger import registrar_erro
 
+# Configuração do logger
+logging.basicConfig(
+    filename="erro.log",
+    level=logging.ERROR,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filemode="a",
+)
+
+def registrar_erro(func):
+    """Decorator para capturar erros e registrá-los no log."""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logging.error(f"Erro na função {func.__name__}: {e}", exc_info=True)
+            raise e
+    return wrapper
+
+@registrar_erro
 def listar_apps():
     """
     Lista todos os aplicativos instalados usando o winget.
@@ -13,7 +34,7 @@ def listar_apps():
     except Exception as e:
         print(f"Erro ao listar aplicativos: {e}")
 
-
+@registrar_erro
 def instalar_programas():
     """
     Instala programas úteis no Windows usando o winget.
@@ -39,7 +60,7 @@ def instalar_programas():
     
     print("Processo de instalação concluído!")
 
-
+@registrar_erro
 def limpar_cache():
     """
     Limpa arquivos temporários e cache do sistema.
@@ -58,7 +79,7 @@ def limpar_cache():
         except Exception as e:
             print(f"Erro ao limpar {pasta}: {e}")
 
-
+@registrar_erro
 def monitorar_desempenho():
     """
     Mostra informações de desempenho do sistema.
@@ -74,7 +95,7 @@ def monitorar_desempenho():
     except Exception as e:
         print(f"Erro ao monitorar desempenho: {e}")
 
-
+@registrar_erro
 def atualizar_sistema():
     """
     Verifica e instala atualizações do sistema usando o Windows Update.
@@ -87,11 +108,12 @@ def atualizar_sistema():
     except Exception as e:
         print(f"Erro ao atualizar o sistema: {e}")
 
-
+@registrar_erro
 def atualizar_sistema():
     # (sem alterações)
     pass
 
+@registrar_erro
 def gerenciar_rede():
     """
     Mostra informações de rede, renova o DHCP e configura IP fixo (se necessário).
@@ -105,7 +127,7 @@ def gerenciar_rede():
     except Exception as e:
         print(f"Erro ao gerenciar a rede: {e}")
 
-
+@registrar_erro
 def realizar_ping(endereco):
     """
     Realiza um ping para um endereço de IP ou domínio.
@@ -117,7 +139,7 @@ def realizar_ping(endereco):
     except Exception as e:
         print(f"Erro ao realizar o ping para {endereco}: {e}")
 
-
+@registrar_erro
 def configurar_ip_fixo(ip, mascara, gateway, dns_primario, dns_secundario=None):
     """
     Configura IP fixo para o adaptador de rede ativo.
@@ -138,3 +160,24 @@ def configurar_ip_fixo(ip, mascara, gateway, dns_primario, dns_secundario=None):
         print("IP fixo configurado com sucesso!")
     except Exception as e:
         print(f"Erro ao configurar IP fixo: {e}")
+
+@registrar_erro
+def testar_conectividade(endereco: str) -> str:
+    """
+    Testa a conectividade com um endereço (ping).
+    :param endereco: Endereço a ser testado.
+    :return: Resultado do ping como string.
+    """
+    try:
+        resultado = subprocess.run(
+            ["ping", "-n", "4", endereco],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if resultado.returncode == 0:
+            return f"Ping bem-sucedido para {endereco}:\n{resultado.stdout}"
+        else:
+            return f"Falha ao pingar {endereco}:\n{resultado.stderr}"
+    except Exception as e:
+        return f"Erro ao realizar o ping: {str(e)}"
