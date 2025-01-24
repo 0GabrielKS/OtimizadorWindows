@@ -1,9 +1,27 @@
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
+from threading import Thread
+import subprocess
+import sys
+import io
+from contextlib import redirect_stdout
 from funcoes.desinstalador import desinstalar_apps_padrao
 from funcoes.utilitarios import instalar_programas
 from funcoes.rede import testar_conectividade, configurar_ip_fixo, redefinir_para_dhcp
 from funcoes.configuracoes import aplicar_configuracoes_windows
+
+
+class StdoutRedirector(io.StringIO):
+    """Classe para redirecionar o stdout para uma StringIO."""
+
+    def __init__(self, text_widget):
+        super().__init__()
+        self.text_widget = text_widget
+
+    def write(self, s):
+        self.text_widget.insert(tk.END, s)
+        self.text_widget.see(tk.END)  # Scroll automático para o final
+        self.text_widget.update()
 
 
 def criar_interface():
@@ -26,39 +44,51 @@ def criar_interface():
         """Exibe uma janela de progresso enquanto as tarefas são executadas."""
         progresso_janela = tk.Toplevel(root)
         progresso_janela.title("Progresso")
-        progresso_janela.geometry("400x200")
+        progresso_janela.geometry("500x400")
         progresso_janela.resizable(False, False)
         progresso_janela.configure(bg="#f5f5f5")
 
         # Barra de progresso
-        barra = ttk.Progressbar(progresso_janela, orient="horizontal", length=300, mode="determinate")
-        barra.pack(pady=20)
+        barra = ttk.Progressbar(progresso_janela, orient="horizontal", length=400, mode="determinate")
+        barra.pack(pady=10)
 
         # Label para exibir mensagens
         status_label = tk.Label(progresso_janela, text="Iniciando...", bg="#f5f5f5", font=("Arial", 12))
         status_label.pack(pady=10)
 
+        # Widget de texto para exibir logs
+        log_text = tk.Text(progresso_janela, wrap="word", width=60, height=15, bg="#eaeaea", fg="#333")
+        log_text.pack(padx=10, pady=10)
+
         progresso_janela.update()
 
-        # Executar tarefas e atualizar a barra de progresso
-        progresso = 0
-        incremento = 100 // len(tarefas)
-        for tarefa, descricao in tarefas:
-            try:
-                status_label.config(text=descricao)
-                progresso_janela.update()
-                tarefa()
-                progresso += incremento
-                barra["value"] = progresso
-                progresso_janela.update()
-            except Exception as e:
-                messagebox.showerror("Erro", f"Ocorreu um erro: {e}")
-                progresso_janela.destroy()
-                return
+        def executar_tarefas():
+            progresso = 0
+            incremento = 100 // len(tarefas)
+            stdout_redirector = StdoutRedirector(log_text)
+            with redirect_stdout(stdout_redirector):
+                for tarefa, descricao in tarefas:
+                    try:
+                        status_label.config(text=descricao)
+                        progresso_janela.update()
+                        tarefa()  # Executa a tarefa
+                        progresso += incremento
+                        barra["value"] = progresso
+                        progresso_janela.update()
+                    except Exception as e:
+                        print(f"Erro: {e}")
+                        messagebox.showerror("Erro", f"Ocorreu um erro: {e}")
+                        progresso_janela.destroy()
+                        return
 
-        status_label.config(text="Concluído!")
-        messagebox.showinfo("Sucesso", "Todas as tarefas foram concluídas com sucesso!")
-        progresso_janela.destroy()
+            status_label.config(text="Concluído!")
+            print("Todas as tarefas foram concluídas com sucesso!")
+            messagebox.showinfo("Sucesso", "Todas as tarefas foram concluídas com sucesso!")
+            progresso_janela.destroy()
+
+        # Criar uma thread para executar as tarefas
+        thread = Thread(target=executar_tarefas)
+        thread.start()
 
     # Criar os botões de funcionalidade
     def opcao_desinstalar():
