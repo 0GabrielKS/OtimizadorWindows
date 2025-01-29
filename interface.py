@@ -1,27 +1,11 @@
 import tkinter as tk
-from tkinter import messagebox, simpledialog, ttk
-from threading import Thread
-import subprocess
-import sys
-import io
-from contextlib import redirect_stdout
+from tkinter import messagebox, simpledialog
+from tkinter.scrolledtext import ScrolledText
 from funcoes.desinstalador import desinstalar_apps_padrao
 from funcoes.utilitarios import instalar_programas
 from funcoes.rede import testar_conectividade, configurar_ip_fixo, redefinir_para_dhcp
 from funcoes.configuracoes import aplicar_configuracoes_windows
-
-
-class StdoutRedirector(io.StringIO):
-    """Classe para redirecionar o stdout para uma StringIO."""
-
-    def __init__(self, text_widget):
-        super().__init__()
-        self.text_widget = text_widget
-
-    def write(self, s):
-        self.text_widget.insert(tk.END, s)
-        self.text_widget.see(tk.END)  # Scroll automático para o final
-        self.text_widget.update()
+import threading
 
 
 def criar_interface():
@@ -29,7 +13,7 @@ def criar_interface():
     # Configurar a janela principal
     root = tk.Tk()
     root.title("Otimizador do Windows")
-    root.geometry("400x500")
+    root.geometry("500x500")
     root.resizable(False, False)
     root.configure(bg="#f5f5f5")
 
@@ -39,69 +23,55 @@ def criar_interface():
     )
     titulo.pack(pady=20)
 
-    # Função para mostrar progresso
-    def mostrar_progresso(tarefas):
-        """Exibe uma janela de progresso enquanto as tarefas são executadas."""
-        progresso_janela = tk.Toplevel(root)
-        progresso_janela.title("Progresso")
-        progresso_janela.geometry("500x400")
-        progresso_janela.resizable(False, False)
-        progresso_janela.configure(bg="#f5f5f5")
+    # Criar uma janela separada para exibir logs e progresso
+    def abrir_tela_log():
+        tela_log = tk.Toplevel(root)
+        tela_log.title("Detalhes da Execução")
+        tela_log.geometry("600x400")
+        tela_log.resizable(False, False)
+        tela_log.configure(bg="#f5f5f5")
 
-        # Barra de progresso
-        barra = ttk.Progressbar(progresso_janela, orient="horizontal", length=400, mode="determinate")
-        barra.pack(pady=10)
+        # Log de execução
+        log_text = ScrolledText(tela_log, height=20, state="disabled", wrap="word", bg="#fff", fg="#333", font=("Arial", 10))
+        log_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # Label para exibir mensagens
-        status_label = tk.Label(progresso_janela, text="Iniciando...", bg="#f5f5f5", font=("Arial", 12))
-        status_label.pack(pady=10)
+        # Função para atualizar os logs
+        def logar(mensagem):
+            log_text.config(state="normal")
+            log_text.insert(tk.END, mensagem + "\n")
+            log_text.config(state="disabled")
+            log_text.see(tk.END)
 
-        # Widget de texto para exibir logs
-        log_text = tk.Text(progresso_janela, wrap="word", width=60, height=15, bg="#eaeaea", fg="#333")
-        log_text.pack(padx=10, pady=10)
+        return logar
 
-        progresso_janela.update()
+    # Inicializar a função de log
+    logar = abrir_tela_log()
 
-        def executar_tarefas():
-            progresso = 0
-            incremento = 100 // len(tarefas)
-            stdout_redirector = StdoutRedirector(log_text)
-            with redirect_stdout(stdout_redirector):
-                for tarefa, descricao in tarefas:
-                    try:
-                        status_label.config(text=descricao)
-                        progresso_janela.update()
-                        tarefa()  # Executa a tarefa
-                        progresso += incremento
-                        barra["value"] = progresso
-                        progresso_janela.update()
-                    except Exception as e:
-                        print(f"Erro: {e}")
-                        messagebox.showerror("Erro", f"Ocorreu um erro: {e}")
-                        progresso_janela.destroy()
-                        return
+    # Funções de ação
+    def executar_tarefa(funcao, descricao):
+        """Executa uma função em uma thread separada."""
+        logar(f"Iniciando: {descricao}...\n")
 
-            status_label.config(text="Concluído!")
-            print("Todas as tarefas foram concluídas com sucesso!")
-            messagebox.showinfo("Sucesso", "Todas as tarefas foram concluídas com sucesso!")
-            progresso_janela.destroy()
+        def tarefa():
+            try:
+                funcao()
+                logar(f"Concluído: {descricao}!\n")
+            except Exception as e:
+                logar(f"Erro ao executar {descricao}: {e}\n")
 
-        # Criar uma thread para executar as tarefas
-        thread = Thread(target=executar_tarefas)
-        thread.start()
+        threading.Thread(target=tarefa, daemon=True).start()
 
-    # Criar os botões de funcionalidade
     def opcao_desinstalar():
-        mostrar_progresso([(desinstalar_apps_padrao, "Desinstalando aplicativos padrão...")])
+        executar_tarefa(desinstalar_apps_padrao, "Desinstalação de Aplicativos Padrão")
 
     def opcao_instalar():
-        mostrar_progresso([(instalar_programas, "Instalando programas úteis...")])
+        executar_tarefa(instalar_programas, "Instalação de Programas Úteis")
 
     def opcao_rede():
         """Submenu de configurações de rede."""
         submenu_rede = tk.Toplevel(root)
         submenu_rede.title("Opções de Rede")
-        submenu_rede.geometry("350x400")
+        submenu_rede.geometry("400x400")
         submenu_rede.resizable(False, False)
         submenu_rede.configure(bg="#f0f0f0")
 
@@ -116,7 +86,7 @@ def criar_interface():
         def testar_ping():
             endereco = simpledialog.askstring("Ping", "Digite o endereço IP ou hostname para testar:")
             if endereco:
-                mostrar_progresso([(lambda: testar_conectividade(endereco, submenu_rede), f"Testando conectividade com {endereco}...")])
+                executar_tarefa(lambda: testar_conectividade(endereco, logar), f"Testando conectividade com {endereco}")
             else:
                 messagebox.showwarning("Atenção", "Você precisa informar um endereço IP ou hostname!")
 
@@ -136,9 +106,10 @@ def criar_interface():
             )
 
             if ip and mascara and gateway and dns_primario:
-                mostrar_progresso([
-                    (lambda: configurar_ip_fixo(ip, mascara, gateway, dns_primario, dns_secundario), "Configurando IP fixo...")
-                ])
+                executar_tarefa(
+                    lambda: configurar_ip_fixo(ip, mascara, gateway, dns_primario, dns_secundario),
+                    "Configuração de IP Fixo"
+                )
             else:
                 messagebox.showwarning("Atenção", "Todos os campos obrigatórios devem ser preenchidos!")
 
@@ -148,7 +119,7 @@ def criar_interface():
         btn_configurar_ip.pack(pady=10)
 
         def redefinir_dhcp():
-            mostrar_progresso([(redefinir_para_dhcp, "Redefinindo para DHCP automático...")])
+            executar_tarefa(redefinir_para_dhcp, "Redefinir para DHCP Automático")
 
         btn_redefinir_dhcp = tk.Button(
             submenu_rede,
@@ -159,16 +130,16 @@ def criar_interface():
         btn_redefinir_dhcp.pack(pady=10)
 
     def opcao_customizacoes():
-        mostrar_progresso([(aplicar_configuracoes_windows, "Aplicando customizações do Windows...")])
+        executar_tarefa(aplicar_configuracoes_windows, "Aplicar Configurações do Windows")
 
     def grande_botao_vermelho():
         """Executa as três funções principais ao ser clicado."""
-        tarefas = [
-            (desinstalar_apps_padrao, "Desinstalando aplicativos padrão..."),
-            (instalar_programas, "Instalando programas úteis..."),
-            (aplicar_configuracoes_windows, "Aplicando customizações do Windows...")
-        ]
-        mostrar_progresso(tarefas)
+        def executar_todas():
+            desinstalar_apps_padrao()
+            instalar_programas()
+            aplicar_configuracoes_windows()
+
+        executar_tarefa(executar_todas, "Grande Botão Vermelho")
 
     # Adicionar botões à interface principal
     btn_desinstalar = tk.Button(

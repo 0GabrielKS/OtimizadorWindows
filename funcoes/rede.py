@@ -1,33 +1,35 @@
 import subprocess
 from tkinter import messagebox, simpledialog, Toplevel, Text, Scrollbar, END
 
-def testar_conectividade(endereco, parent_window):
-    """Testa a conectividade via ping para um endereço especificado e exibe o resultado completo."""
+import subprocess
+
+def testar_conectividade(endereco, janela_log):
+    """
+    Testa a conectividade com um endereço IP ou hostname usando ping.
+
+    :param endereco: Endereço IP ou hostname a ser testado.
+    :param janela_log: Função para registrar mensagens no log da interface.
+    """
     try:
-        resultado = subprocess.run(
-            ["ping", "-n", "4", endereco],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        # Criar uma nova janela para exibir o resultado completo
-        janela_resultado = Toplevel(parent_window)
-        janela_resultado.title(f"Resultado do Ping: {endereco}")
-        janela_resultado.geometry("500x400")
+        janela_log(f"Testando conectividade com {endereco}...\n")
+        
+        # Executa o comando de ping (ajuste '-n' para Windows e '-c' para Linux/Mac)
+        comando = ["ping", "-n", "4", endereco]  # Para Linux/Mac, troque "-n" por "-c".
+        processo = subprocess.Popen(comando, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
-        # Área de texto para exibir a saída do ping
-        text_area = Text(janela_resultado, wrap="word", font=("Courier", 10))
-        text_area.insert(END, resultado.stdout if resultado.returncode == 0 else resultado.stderr)
-        text_area.config(state="disabled")
-        text_area.pack(side="left", fill="both", expand=True)
+        # Captura e exibe a saída do ping em tempo real
+        for linha in processo.stdout:
+            janela_log(linha.strip())
 
-        # Barra de rolagem
-        scroll_bar = Scrollbar(janela_resultado, command=text_area.yview)
-        text_area.config(yscrollcommand=scroll_bar.set)
-        scroll_bar.pack(side="right", fill="y")
+        # Aguarda o término do processo
+        processo.wait()
 
+        if processo.returncode == 0:
+            janela_log("\nConectividade testada com sucesso!\n")
+        else:
+            janela_log("\nFalha ao testar conectividade.\n")
     except Exception as e:
-        messagebox.showerror("Erro", f"Ocorreu um erro ao testar conectividade: {e}")
+        janela_log(f"Erro ao executar o ping: {e}\n")
 
 def configurar_ip_fixo(ip, mascara, gateway, dns_primario, dns_secundario):
     """Configura o IP fixo e os servidores DNS."""
