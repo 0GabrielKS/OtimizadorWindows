@@ -79,6 +79,16 @@ gerenciador-funcoes-windows/
 
 ## Como Usar o Programa
 
+No terminal, navegue até a pasta onde está o seu arquivo interface.py e execute o comando:
+```bash
+pyinstaller --onefile --windowed --icon=icone.ico interface.py
+```
+Explicação dos parâmetros:
+
+- --onefile: Empacota tudo em um único arquivo executável.
+- --windowed: Impede que o console seja aberto (ideal para aplicações com GUI).
+- --icon=icone.ico: Define o ícone do executável (substitua seu_icone.ico pelo nome/caminho do seu arquivo de ícone).
+
 1. **Execute o programa:** Ao abrir, a interface gráfica será exibida com várias opções de funcionalidades.
 2. **Escolha uma função:**
    - Para desinstalar aplicativos padrão, clique no botão **"Desinstalar aplicativos padrão"**.
